@@ -4,6 +4,7 @@
 
 let sentence = "";
 let lastWord = "";
+let lastPredictTime = 0;
 let localStream;
 let currentRoom = null;
 let peerConnection = null;
@@ -16,6 +17,7 @@ let isChatSpeechOn = false;
 let recognition = null;
 let chatRecognition = null;
 let gestureCount = 0;
+const PREDICTION_INTERVAL_MS = 400;
 
 // ===============================
 // TOAST NOTIFICATIONS
@@ -33,8 +35,8 @@ const remoteVideo = document.getElementById("remoteVideo");
 const canvasElement = document.getElementById("output_canvas");
 const canvasCtx = canvasElement.getContext("2d");
 
-canvasElement.width = 640;
-canvasElement.height = 480;
+canvasElement.width = 480;
+canvasElement.height = 360;
 
 const config = {
     iceServers: [
@@ -76,9 +78,9 @@ async function startVideo() {
 
         hands.setOptions({
             maxNumHands: 2,
-            modelComplexity: 1,
+            modelComplexity: 0,
             minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.7
+            minTrackingConfidence: 0.6
         });
 
         hands.onResults(onResults);
@@ -87,8 +89,8 @@ async function startVideo() {
             onFrame: async () => {
                 await hands.send({ image: localVideo });
             },
-            width: 640,
-            height: 480
+            width: 480,
+            height: 360
         });
 
         camera.start();
@@ -131,6 +133,13 @@ function onResults(results) {
             canvasCtx.restore();
             return;
         }
+
+        const now = Date.now();
+        if (now - lastPredictTime < PREDICTION_INTERVAL_MS) {
+            canvasCtx.restore();
+            return;
+        }
+        lastPredictTime = now;
 
         fetch("/predict", {
             method: "POST",

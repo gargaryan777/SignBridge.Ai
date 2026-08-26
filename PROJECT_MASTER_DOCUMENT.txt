@@ -1,0 +1,166 @@
+=====================================================================
+**1. PROJECT OVERVIEW & CORE PROBLEM STATEMENT**
+=====================================================================
+- Problem scope: People who are deaf or hard-of-hearing in India often face daily communication barriers in schools, healthcare, public services, and casual conversations. Most hearing people do not understand Indian Sign Language (ISL), which forces reliance on interpreters or written notes, slowing communication and reducing independence.
+- Project vision: SignBridge provides a real-time, browser-based ISL translation experience that watches hand gestures through a webcam, converts them into text, and speaks them aloud. The goal is to enable direct, fluid, and dignified communication between ISL users and hearing participants.
+- What makes it unique: Unlike static, offline translation apps, SignBridge runs inside a live video call, operates hands-free, and delivers immediate voice output with low latency. It also includes accessibility-first features like quick phrases, SOS alerts, and chat dictation, making it a complete communication platform rather than a single-use translator.
+
+=====================================================================
+**2. END-TO-END ARCHITECTURE & DATA FLOW**
+=====================================================================
+Step 1 (Frontend/Capture)
+- The main app UI is served from the Node.js server and rendered by HTML/JS in the browser.
+- The camera stream is initialized via `navigator.mediaDevices.getUserMedia` with video and audio enabled.
+- MediaPipe Hands is loaded from a CDN and runs directly in the browser. The app captures frames at 640x480 and forwards them to the MediaPipe pipeline.
+- The UI overlays live landmarks on the video, shows prediction confidence, and provides controls for mic, camera, and ML toggles.
+- Prediction requests are throttled to roughly one inference every 150 ms to keep the UI smooth and latency stable.
+
+Step 2 (Feature Extraction/Tracking)
+- MediaPipe Hands detects up to two hands per frame.
+- For each detected hand, 21 landmarks are produced. Each landmark provides 3 values: x, y, z.
+- The app builds a flat feature vector of length 126 (2 hands * 21 landmarks * 3 coordinates). If only one hand is visible, the remaining slots are padded with zeros.
+- The app sorts hands by their x-position to ensure a consistent left-to-right feature order.
+
+Step 3 (ML Classification / Processing)
+- The browser sends the 126-value landmark vector to the backend `/predict` endpoint.
+- The Node.js server proxies this request to the Python Flask service to isolate the ML stack.
+- The Python service normalizes landmarks by shifting all points to be wrist-relative and scaling by maximum wrist distance, then applies a StandardScaler.
+- The trained RandomForest model outputs class probabilities and the most likely sign.
+- If confidence is below 0.40, the system returns "Uncertain" to avoid incorrect output.
+- On the frontend, predictions are appended to the live sentence only if confidence exceeds 0.60 and the predicted token differs from the previous one.
+
+Step 4 (LLM/Contextual Smoothing)
+- No LLM or NLP smoothing layer is implemented in the current codebase.
+- Sentence construction uses a deterministic concatenation strategy based on confidence thresholds and word change detection.
+- The design leaves room for a future NLP layer without changing the current pipeline.
+
+Step 5 (Output Layer)
+- The translated text appears in a live transcript panel and can be copied or cleared.
+- For audio, the system first tries ElevenLabs TTS through the Flask `/speak` endpoint. If no API key is available, it falls back to browser SpeechSynthesis voices.
+- The TTS panel allows typed text to be spoken and optionally shared into the room chat.
+
+=====================================================================
+**3. GRANULAR TECH STACK BREAKDOWN**
+=====================================================================
+Backend (Python)
+- Flask 3.1.3
+  - Role: Serves prediction and data-collection endpoints, loads ML model artifacts, and proxies ElevenLabs audio streams.
+  - Why chosen: Minimal setup, easy JSON APIs, fast iteration for ML inference services.
+- NumPy 2.2.3
+  - Role: Numeric transforms for landmark normalization and model input preparation.
+  - Why chosen: Standard library for fast numeric operations.
+- scikit-learn 1.8.0
+  - Role: RandomForest classifier, train/test split, metrics, and preprocessing.
+  - Why chosen: Strong baseline models, quick training, reliable inference.
+- Joblib 1.4.2
+  - Role: Persistence of trained model, label encoder, and scaler.
+  - Why chosen: Lightweight model serialization for scikit-learn.
+- Requests 2.31.0
+  - Role: Calls ElevenLabs TTS API from the backend.
+  - Why chosen: Simple and reliable HTTP client.
+- flask-socketio 5.4.1, eventlet 0.39.0, gunicorn 23.0.0
+  - Role: Present in dependencies; SocketIO is not currently used for prediction flow, but can be used if real-time backend events are added later.
+  - Why chosen: Standard production tooling for Flask and potential real-time features.
+
+Backend (Node.js)
+- Express 4.21.1
+  - Role: Serves the web UI, static assets, and handles routing for the app and collection UI.
+  - Why chosen: Lightweight server for HTTP routing and static assets.
+- Socket.IO 4.8.1
+  - Role: WebRTC signaling, room management, and real-time chat events.
+  - Why chosen: Reliable signaling and event transport for browser-to-browser sessions.
+- express-openid-connect 2.19.4
+  - Role: Auth0 integration for login/logout and user identity.
+  - Why chosen: Simple Auth0 integration for protected app routes.
+- dotenv 17.3.1
+  - Role: Loads environment variables for secrets and API keys.
+  - Why chosen: Safe configuration without hardcoding secrets.
+- concurrently 9.2.1 (dev)
+  - Role: Runs Python and Node servers in parallel for local development.
+  - Why chosen: Convenience for multi-service startup.
+
+Frontend (Main App)
+- MediaPipe Hands (via CDN)
+  - Role: Real-time hand landmark tracking (21 points per hand, x/y/z per point).
+  - Why chosen: Proven real-time performance in the browser without custom native builds.
+- WebRTC
+  - Role: Peer-to-peer video calling between two participants.
+  - Why chosen: Low-latency, browser-native real-time video.
+- Browser Speech APIs
+  - Role: Speech recognition for dictation, and SpeechSynthesis for local TTS fallback.
+  - Why chosen: Built-in browser support reduces dependency load.
+- Vanilla JS / HTML / CSS
+  - Role: Core app UI for live translation, chat, and accessibility features.
+  - Why chosen: Direct DOM control, no framework overhead on the translation surface.
+
+Frontend (Marketing / Landing)
+- React 19.1.1, React DOM 19.1.1
+  - Role: Component-based landing site in `homepage-temp` and compiled build in `public`.
+  - Why chosen: Rapid UI iteration and reusable components.
+- Vite 7.1.7
+  - Role: Bundler and dev server for the landing page.
+  - Why chosen: Fast builds and modern tooling.
+- Tailwind CSS 4.1.17 and React Icons 5.5.0
+  - Role: Styling and UI iconography for the landing page.
+  - Why chosen: Speed of UI iteration and consistent styling patterns.
+
+External Services
+- ElevenLabs Text-to-Speech API
+  - Role: High-quality voice output for translated text.
+  - Why chosen: Natural-sounding speech and multilingual voice options.
+- Auth0
+  - Role: User authentication for protected app routes.
+  - Why chosen: Secure, production-ready authentication with minimal custom code.
+
+=====================================================================
+**4. CORE FEATURES & IMPLEMENTATION DETAILS**
+=====================================================================
+- Real-time video/gesture processing
+  - MediaPipe runs in the browser, extracting 21 landmarks per hand in real time.
+  - The prediction loop is throttled to avoid UI stutter and excessive backend calls.
+  - Landmark features are normalized for scale and position stability before classification.
+- Multi-modal output (Text + Audio)
+  - Live translation text is appended based on confidence and word change checks.
+  - ElevenLabs TTS is used when available; browser speech synthesis is a guaranteed fallback.
+  - A dedicated TTS panel allows typed messages to be spoken and shared into the session.
+- UI/UX highlights
+  - Live confidence meter, translation overlay, and gesture counters give immediate feedback.
+  - WebRTC video calling is embedded with a room code flow for peer discovery.
+  - Accessibility tools include quick phrases, emotion reactions, and SOS alerts with audio.
+- Low-latency optimizations
+  - Prediction is throttled to 150 ms intervals.
+  - Confidence gating avoids frequent incorrect outputs.
+  - Wrist-relative normalization and scale normalization stabilize input features for more consistent inference.
+
+=====================================================================
+**5. FUTURE ROADMAP & SCALABILITY**
+=====================================================================
+- Expand gesture vocabulary
+  - Add more ISL signs and continuous gesture sequences, not just isolated tokens.
+  - Increase data diversity (hand sizes, skin tones, lighting conditions, camera angles).
+  - Consider balanced sampling or per-class augmentation to improve minority classes.
+- Two-way communication
+  - Add text-to-ISL output through a 3D avatar or animated sign video library.
+  - Use a sentence-level model to select and sequence sign animations with proper grammar.
+- Mobile and low-bandwidth optimization
+  - Implement adaptive frame sampling and lower resolution capture for mobile devices.
+  - Add on-device inference options or a lightweight model for slower networks.
+  - Use caching and batching for prediction calls to reduce network overhead.
+
+=====================================================================
+**6. EXPECTED PRESENTATION Q&A (VIVA CHEAT SHEET)**
+=====================================================================
+1) Q: How does your model avoid incorrect translations in live use?
+   A: The backend returns "Uncertain" below 0.40 confidence, and the UI only appends words above 0.60 confidence. This two-stage gating prevents noisy predictions from being spoken or added to the transcript.
+
+2) Q: Why did you use wrist-relative normalization in the features?
+   A: Wrist-relative coordinates remove absolute position and scaling effects so the model learns hand shape rather than where the hand is on screen. This improves robustness across different users and camera placements.
+
+3) Q: Why RandomForest instead of a deep learning model?
+   A: RandomForest provides fast inference with strong accuracy for landmark-based features and requires less data to train. It is a strong baseline for real-time systems with low latency constraints.
+
+4) Q: How is real-time video calling integrated with the translator?
+   A: WebRTC handles the peer-to-peer video stream, while Socket.IO provides signaling and room coordination. The translation runs locally in the browser and sends only landmark vectors to the ML backend.
+
+5) Q: Is there any LLM-based sentence correction or grammar layer?
+   A: No. The current implementation uses deterministic concatenation and confidence thresholds. This is intentional for low latency and transparency, and the architecture allows a future NLP layer without breaking the pipeline.

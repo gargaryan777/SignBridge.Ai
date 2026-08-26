@@ -30,6 +30,11 @@ print(data.iloc[:, -1].value_counts())
 # We used to throw away hundreds of valid rows to match the smallest class.
 # Now, we keep ALL data and use algorithmic balancing, drastically improving accuracy!
 
+# Filter out rows without hand data (all zeros)
+non_zero_mask = (data.iloc[:, :-1] != 0).any(axis=1)
+data = data[non_zero_mask]
+print(f"Removed {len(non_zero_mask) - data.shape[0]} empty rows. Final valid rows: {data.shape[0]}")
+
 label_column = data.columns[-1]
 
 print("\nRetaining all data for maximum efficiency. Class distribution remains:")

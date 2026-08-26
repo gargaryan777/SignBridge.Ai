@@ -1,0 +1,80 @@
+================================================================
+     SIGNBRIDGE — TEAM PRESENTATION CHEAT SHEET
+     (Read this once. You're ready.)
+================================================================
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. WHAT IS THIS PROJECT?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SignBridge is a real-time video call platform that watches a
+deaf or mute person's hand signs through their camera and
+instantly translates them into spoken words — so they can
+communicate naturally with anyone, no interpreter needed.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. HOW IT WORKS — THE 3-STEP FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  STEP 1 — INPUT (Camera)
+  ┌────────────────────────────────────────────────────────┐
+  │  The user opens their camera in the browser.          │
+  │  The app watches their hands in real time.            │
+  └────────────────────────────────────────────────────────┘
+
+  STEP 2 — PROCESSING (ML Magic)
+  ┌────────────────────────────────────────────────────────┐
+  │  A tool called MediaPipe maps 21 tiny dots onto        │
+  │  each finger joint to capture the exact hand shape.   │
+  │  Those dot positions are sent to our AI model, which  │
+  │  was trained on thousands of ISL signs and figures out │
+  │  what word or letter the hand shape means.            │
+  └────────────────────────────────────────────────────────┘
+
+  STEP 3 — OUTPUT (Voice)
+  ┌────────────────────────────────────────────────────────┐
+  │  The recognized word appears on screen AND is spoken   │
+  │  aloud using a realistic AI voice (ElevenLabs).       │
+  │  The other person on the video call hears it live.    │
+  └────────────────────────────────────────────────────────┘
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. THE TECH STACK — SIMPLIFIED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Tool              What it does for us
+  ─────────────────────────────────────────────────────────
+  MediaPipe       → Tracks hand joints in camera
+  Random Forest   → Our AI that reads hand shapes
+  Flask (Python)  → The brain / backend server
+  Socket.IO       → Connects two people live
+  WebRTC          → Sends the video call peer-to-peer
+  ElevenLabs API  → Turns text into natural speech
+  Vanilla JS/HTML → Everything you see on screen
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. QUICK PITCH TIPS — HOW TO ANSWER JUDGES CONFIDENTLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  • If asked "How accurate is it?" →
+    Say: "Our model was trained on real ISL gesture data and
+    only speaks out a word when it is more than 60% confident,
+    so it avoids random wrong guesses."
+
+  • If asked "Why not just use subtitles or an app?" →
+    Say: "Most apps are offline, one-way, or need a phone in
+    hand. Ours works inside a live video call, hands-free,
+    and speaks aloud to the other person in real time."
+
+  • If asked "What's next / how would you scale this?" →
+    Say: "We can train it on more signs and full ISL sentences,
+    add more languages, and make it a browser plugin so it
+    works inside Google Meet or Zoom without any install."
+
+================================================================
+                   YOU'VE GOT THIS. GOOD LUCK!
+================================================================
